@@ -61,7 +61,8 @@ body { margin: 0; background: #1a1816; color: var(--ink); font-family: var(--bod
 #gallery .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
 #gallery .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(24,22,20,0.7); color: var(--ink); font-size: 1.3rem; cursor: pointer; }
 #gallery .prev { left: 14px; } #gallery .next { right: 14px; }
-#gallery .close { position: absolute; top: 12px; right: 14px; }
+#gallery .close { position: absolute; top: 12px; right: 14px; z-index: 3; }
+#gallery .nav { z-index: 2; }
 @media (pointer: coarse) { #pad { display: block; } .desk { display: none; } }
 @media (pointer: fine) { .touch { display: none; } }
 @media (max-width: 560px) { #brand p { display: none; } #help { display: none; } #rooms button { padding: 7px 8px; font-size: 0.74rem; } }
