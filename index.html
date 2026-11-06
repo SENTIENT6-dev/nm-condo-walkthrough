@@ -153,6 +153,17 @@ const PLANS = [{"n": "A-0", "t": "Cover, index and finish schedule", "src": "dra
   document.getElementById('plans1').onclick = (e) => open(e.currentTarget);
   document.getElementById('plans2').onclick = (e) => open(e.currentTarget);
   document.getElementById('pclose').onclick = close;
+  // PDF download: plain link on a normal website; inside Claude the viewer saves through the downloads capability
+  let dl = null;
+  if (window.claude && window.claude.use) window.claude.use('downloads').then((d) => { dl = d; }).catch(() => {});
+  document.getElementById('pdl').addEventListener('click', async (e) => {
+    if (!dl) return;
+    e.preventDefault();
+    const a = e.currentTarget, label = a.textContent; a.textContent = 'Preparing…';
+    try { const blob = await (await fetch(a.getAttribute('href'))).blob(); await dl.save({ filename: a.getAttribute('href'), data: blob }); }
+    catch (err) { if (err && err.code && err.code !== 'declined') window.open(a.href, '_blank'); }
+    finally { a.textContent = label; }
+  });
   sheet.addEventListener('click', (e) => { const r = img.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
     sheet.classList.toggle('zoom'); if (sheet.classList.contains('zoom')) sheet.scrollTo(fx * img.scrollWidth - sheet.clientWidth / 2, fy * img.scrollHeight - sheet.clientHeight / 2); });
   window.addEventListener('keydown', (e) => { if (!el.classList.contains('open')) return; if (e.key === 'Escape') close(); if (e.key === 'ArrowDown' || e.key === 'ArrowRight') show(i + 1); if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') show(i - 1); e.stopPropagation(); }, true);
