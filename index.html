@@ -95,7 +95,7 @@ body { margin: 0; background: #1a1816; color: var(--ink); font-family: var(--bod
 #gallery .nav { z-index: 2; }
 @media (pointer: coarse) { #pad { display: block; } .desk { display: none; } }
 @media (pointer: fine) { .touch { display: none; } }
-@media (pointer: coarse) { #help ol.steps.desk { display: none; } }
+@media (pointer: coarse) { #help ol.steps.desk { display: none; } .hud, .btn.ghost { backdrop-filter: none; -webkit-backdrop-filter: none; } .hud { background: rgba(28, 26, 24, 0.9); } }
 @media (pointer: fine) { #help ol.steps.touch { display: none; } }
 @media (max-width: 560px) {
   #brand { max-width: calc(100vw - 180px); padding: 8px 10px; } #brand h1 { font-size: 0.98rem; }
@@ -218,11 +218,12 @@ const TEX = {"FL-0": {"src": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD
 setTimeout(function () {
   const stage = document.getElementById('stage');
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const PHONE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;   // phones / tablets: lighter pipeline
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PHONE ? 1.5 : 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.82;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !PHONE;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.appendChild(renderer.domElement);
   const scene = new THREE.Scene();
@@ -760,7 +761,32 @@ setTimeout(function () {
     return hits.length ? hits[0].object : null;
   }
   const blockers = [];
-  scene.traverse((ob) => { if (ob.isMesh && !ob.userData.op && ob.material !== aoStripMat && ob !== skyDome) blockers.push(ob); });
+  (function mergeStatic() {
+    const groups = new Map(), drop = [];
+    scene.children.forEach((o) => {
+      if (!(o.isMesh || o.isLineSegments) || o === skyDome || ceilings.includes(o) || o.userData.op || (o.material && o.material.isShaderMaterial) || o.type === 'Reflector') return;
+      const key = (o.isLineSegments ? 'L' : 'M') + o.material.uuid + (o.castShadow ? 's' : '') + (o.receiveShadow ? 'r' : '') + o.renderOrder;
+      if (!groups.has(key)) groups.set(key, []); groups.get(key).push(o); drop.push(o);
+    });
+    groups.forEach((list) => {
+      const first = list[0], pos = [], nor = [], uvs = [], line = first.isLineSegments;
+      list.forEach((o) => {
+        o.updateMatrixWorld(true);
+        const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()); g.applyMatrix4(o.matrixWorld);
+        const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+        for (let i = 0; i < P.count; i++) { pos.push(P.getX(i), P.getY(i), P.getZ(i));
+          if (!line) { if (N) nor.push(N.getX(i), N.getY(i), N.getZ(i)); else nor.push(0, 1, 0); if (U) uvs.push(U.getX(i), U.getY(i)); else uvs.push(0, 0); } }
+        g.dispose();
+      });
+      const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      if (!line) { G.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); G.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); }
+      G.computeBoundingSphere();
+      const M_ = line ? new THREE.LineSegments(G, first.material) : new THREE.Mesh(G, first.material);
+      M_.castShadow = first.castShadow; M_.receiveShadow = first.receiveShadow; M_.renderOrder = first.renderOrder; scene.add(M_);
+      if (!line && first.material !== aoStripMat && first.material !== aoMat) blockers.push(M_);
+    });
+    drop.forEach((o) => { scene.remove(o); o.geometry.dispose(); });
+  })();
   // ---------- lighting
   // image-based light from a simple bright room (soft reflections on wood, stone and glass)
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -783,12 +809,19 @@ setTimeout(function () {
   Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 10, bottom: -10, near: 1, far: 40 }); sun.shadow.camera.updateProjectionMatrix();
   // ---------- light registry: daylight vs evening
   const RIG = [];
-  SCENE.windows.forEach((w) => {
+  const POOL = [], SRC = [];
+  if (PHONE) for (let i = 0; i < 6; i++) { const L = new THREE.PointLight('#ffe9c4', 0, 5, 2); scene.add(L); POOL.push(L); }
+  if (!PHONE) SCENE.windows.forEach((w) => {
     const cx = (w.x[0] + w.x[1]) / 2, cy = (w.y[0] + w.y[1]) / 2, thinX = w.x[1] - w.x[0] < w.y[1] - w.y[0];
     const p = new THREE.PointLight('#dcebff', 0.55, 5.5, 2); p.position.set(cx + (thinX ? (cx > 0 ? -0.6 : 0.6) : 0), 1.4, -(cy + (thinX ? 0 : (cy < 0 ? 0.6 : -0.6)))); scene.add(p);
     RIG.push({ l: p, k: 'window', base: 0.55 });
   });
   SCENE.lights.forEach((l) => {
+    if (PHONE) {
+      if (l.k === 'down') { const disc = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16), MAT.LED); disc.rotation.x = Math.PI / 2; disc.position.set(l.x, l.z + 0.055, -l.y); scene.add(disc); }
+      SRC.push({ p: new THREE.Vector3(l.x, l.k === 'fill' ? Math.min(l.z, 1.85) : l.z - (l.k === 'down' ? 0.5 : 0), -l.y), c: l.c, i: l.i * (l.k === 'down' ? 2.0 : 1.35), d: l.d * (l.k === 'down' ? 1.4 : 1), k: l.k || 'fill' });
+      return;
+    }
     let L;
     if (l.k === 'down') {
       L = new THREE.SpotLight(l.c, l.i * 2.2, l.d * 1.6, 0.85, 0.85, 2); L.position.set(l.x, l.z, -l.y);
@@ -797,10 +830,11 @@ setTimeout(function () {
     } else { L = new THREE.PointLight(l.c, l.i * 1.35, l.d, 2); L.position.set(l.x, l.k === 'fill' ? Math.min(l.z, 1.85) : l.z, -l.y); }
     scene.add(L); RIG.push({ l: L, k: l.k || 'fill', base: L.intensity });
   });
-  LAMPS.forEach((v) => { const L = new THREE.PointLight('#ffd7a0', 0.0, 4.5, 2); L.position.copy(v); stageGroup.add(L); RIG.push({ l: L, k: 'floorlamp', base: 0.9 }); });
+  if (PHONE) LAMPS.forEach((v) => SRC.push({ p: v.clone(), c: '#ffd7a0', i: 0.9, d: 4.5, k: 'floorlamp' }));
+  if (!PHONE) LAMPS.forEach((v) => { const L = new THREE.PointLight('#ffd7a0', 0.0, 4.5, 2); L.position.copy(v); stageGroup.add(L); RIG.push({ l: L, k: 'floorlamp', base: 0.9 }); });
   const MOODS = {
-    day: { sun: 1.15, hemi: 0.3, env: 1, exp: 0.76, window: 1, fill: 1, down: 0.35, lamp: 0.55, floorlamp: 0, shade: 0.35, candle: 0, sky: 'day', bg: '#bcd3e2' },
-    eve: { sun: 0, hemi: 0.06, env: 0.25, exp: 1.0, window: 0.05, fill: 0.22, down: 1.7, lamp: 1.9, floorlamp: 1, shade: 1.1, candle: 1.4, sky: 'eve', bg: '#1d2234' }
+    day: { sun: 1.15, hemi: PHONE ? 0.75 : 0.3, env: 1, exp: 0.76, window: 1, fill: 1, down: 0.35, lamp: 0.55, floorlamp: 0, shade: 0.35, candle: 0, sky: 'day', bg: '#bcd3e2' },
+    eve: { sun: 0, hemi: PHONE ? 0.16 : 0.06, env: 0.25, exp: 1.0, window: 0.05, fill: 0.22, down: 1.7, lamp: 1.9, floorlamp: 1, shade: 1.1, candle: 1.4, sky: 'eve', bg: '#1d2234' }
   };
   let mood = 'day';
   function setMood(m) {
@@ -921,6 +955,7 @@ setTimeout(function () {
   camera.position.set(v0.p[0], 1.6, -v0.p[1]); [yaw, pitch] = lookAtYawPitch(v0.p, v0.t); markActive('Living room');
   let last = performance.now();
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function stepPool() {}
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (mode === 'walk') {
@@ -950,6 +985,14 @@ setTimeout(function () {
     }
     stepOps(dt);
     updateRoom();
+    if (PHONE && SRC.length) {                                         // nearest fixtures drive the light pool (cheap on phones)
+      const o = MOODS[mood], cp = camera.position;
+      if (!stepPool.t || now - stepPool.t > 250) { stepPool.t = now;
+        const near = SRC.map((s) => [s, s.p.distanceToSquared(cp)]).sort((a, b) => a[1] - b[1]).slice(0, POOL.length);
+        POOL.forEach((L, i) => { const s = near[i] && near[i][0]; if (!s) { L.intensity = 0; return; }
+          L.position.copy(s.p); L.color.set(s.c); L.distance = s.d; L.intensity = s.i * (o[s.k] !== undefined ? o[s.k] : 1) * (s.k === 'floorlamp' && !stageGroup.visible ? 0 : 1); });
+      }
+    }
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
