@@ -146,7 +146,7 @@ body { margin: 0; background: #1a1816; color: var(--ink); font-family: var(--bod
       <li><b>See the drawings</b><span>Tap the printed set on the kitchen island, or Drawings below.</span></li>
     </ol>
     <div class="grp"><span class="gl">View</span>
-      <button id="mood" type="button" aria-pressed="false">Evening light: off</button>
+      <button id="mood" type="button" aria-pressed="true">Evening light: on</button>
       <button id="furn" type="button" aria-pressed="true">Furniture: on</button>
       <button id="ghost" type="button" aria-pressed="false">Walk through walls: off</button></div>
     <div class="grp"><span class="gl">Living room paint</span>
@@ -849,7 +849,7 @@ setTimeout(function () {
     MAT.SHADE.emissiveIntensity = o.shade; MAT.CANDLE.emissiveIntensity = o.candle; MAT.LED.color.set(m === 'eve' ? '#fff0cf' : '#ffe0a6');
     skyMat.map = SKY[o.sky]; skyMat.needsUpdate = true; scene.background.set(o.bg);
   }
-  setMood('day');
+  setMood('eve');
   // ---------- rooms / where-am-I
   function inPoly(x, y, p) { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { if ((p[i][1] > y) !== (p[j][1] > y) && x < (p[j][0] - p[i][0]) * (y - p[i][1]) / (p[j][1] - p[i][1] + 1e-12) + p[i][0]) c = !c; } return c; }
   const roomEl = document.getElementById('room');
