@@ -119,7 +119,7 @@ body { margin: 0; background: #1a1816; color: var(--ink); font-family: var(--bod
   <div class="row"><button class="btn primary" id="enter" type="button" disabled>Loading 3D…</button><button class="btn ghost" id="photos1" type="button">View photos</button><button class="btn ghost" id="plans1" type="button">Drawings</button></div>
 </div></div>
 <div id="plans" role="dialog" aria-modal="true" aria-label="Drawing set">
-  <header><h2>Drawing set<span>Rev 78 · 11 Nov 2026 · tap a sheet to zoom</span></h2><a class="btn ghost" id="pdl" href="NM_Condo_Drawings_r78.pdf" download>Download PDF</a><button class="btn ghost" id="pclose" type="button">Close</button></header>
+  <header><h2>Drawing set<span>Rev 79 · 11 Nov 2026 · tap a sheet to zoom</span></h2><a class="btn ghost" id="pdl" href="NM_Condo_Drawings_r79.pdf" download>Download PDF</a><button class="btn ghost" id="pclose" type="button">Close</button></header>
   <div class="body"><nav id="plist" aria-label="Sheets"></nav><div class="sheet" id="psheet"><img id="pimg" alt=""></div></div>
 </div>
 <div id="gallery" role="dialog" aria-modal="true" aria-label="Photos">
@@ -128,7 +128,7 @@ body { margin: 0; background: #1a1816; color: var(--ink); font-family: var(--bod
   <div class="cap" id="gcap"></div>
   <div class="thumbs" id="gthumbs"></div>
 </div>
-<div class="hud" id="brand"><h1>NM Condo Walkthrough</h1><p>Renovation per drawing set Rev 78 — primary suite, guest bath and living room. Kitchen, entry and hall are shown as existing.</p><button class="home" id="home" type="button">‹ Main menu</button></div>
+<div class="hud" id="brand"><h1>NM Condo Walkthrough</h1><p>Renovation per drawing set Rev 79 — primary suite, guest bath and living room. Kitchen, entry and hall are shown as existing.</p><button class="home" id="home" type="button">‹ Main menu</button></div>
 <div class="hud" id="where"><span class="dot"></span><span class="lbl">You are in</span><strong id="room">—</strong></div>
 <div class="hud" id="help">
   <div class="hhead"><h2>Help &amp; controls</h2><button id="htoggle" type="button" aria-expanded="true" aria-controls="hbody">Hide</button></div>
@@ -156,7 +156,7 @@ body { margin: 0; background: #1a1816; color: var(--ink); font-family: var(--bod
     <div class="grp"><span class="gl">Guest shower stone</span>
       <select id="gbstone" aria-label="Guest shower stone"><option value="gg" selected>Grey quartzite, gold veins</option><option value="green">Alt · Green-black quartzite</option><option value="noir">Alt · CAVA Noir Blanc (leathered)</option><option value="cal">Alt · White with gold &amp; black veins</option><option value="sea">Alt · White with green bands</option><option value="wb">Alt · White with black flow</option></select></div>
     <div class="grp"><span class="gl">Guest floor tile</span>
-      <select id="gbfloor" aria-label="Guest bath floor tile"><option value="nova" selected>Ciot Nova Como (white)</option><option value="dark">Alt · Dark grey concrete-look</option><option value="light">Alt · Light grey stone-look</option></select></div>
+      <select id="gbfloor" aria-label="Guest bath floor tile"><option value="nova" selected>Ciot Nova Como (white)</option><option value="dark">Alt · Dark grey concrete-look (incl. shower)</option><option value="light">Alt · Light grey stone-look (incl. shower)</option></select></div>
     <div class="grp"><span class="gl">Cabinets</span>
       <button id="openall" type="button">Open all</button>
       <button id="closeall" type="button">Close all</button></div>
@@ -928,7 +928,16 @@ setTimeout(function () {
   document.getElementById('lvscheme').addEventListener('change', (e) => setLvScheme(e.target.value));
   const st3 = { gg: { map: MAT['ST-3'].map, r: 0.3, cc: 0.6, bump: MAT['ST-3'].bumpScale }, noir: { map: MAT['ST-3B'].map, r: 0.68, cc: 0.05, bump: 0.028 }, cal: { map: MAT['ST-3C'].map, r: 0.25, cc: 0.7, bump: 0.004 }, sea: { map: MAT['ST-3D'].map, r: 0.25, cc: 0.7, bump: 0.004 }, wb: { map: MAT['ST-3E'].map, r: 0.25, cc: 0.7, bump: 0.004 }, green: { map: MAT['ST-3F'].map, r: 0.3, cc: 0.6, bump: 0.004 } };
   const fl6 = { nova: MAT['FL-6'].map, dark: MAT['FL-6B'].map, light: MAT['FL-6C'].map };
-  document.getElementById('gbfloor').addEventListener('change', (e) => { const m = MAT['FL-6']; m.map = fl6[e.target.value]; if (m.bumpMap) m.bumpMap = m.map; m.needsUpdate = true; });
+  // Alternates run through the shower too: the FL-7 floor's UVs are scaled at 0.3 m, so its copy repeats at half to keep the same tile size.
+  const fl7nova = { map: MAT['FL-7'].map, bump: MAT['FL-7'].bumpMap };
+  const fl7alt = {};
+  const fl7of = (k) => { if (!fl7alt[k]) { const t = fl6[k].clone(), r = TEX['FL-7'].tile / TEX['FL-6'].tile; t.repeat.set(r, r); t.needsUpdate = true; fl7alt[k] = t; } return fl7alt[k]; };
+  document.getElementById('gbfloor').addEventListener('change', (e) => {
+    const v = e.target.value, m = MAT['FL-6'], s7 = MAT['FL-7'];
+    m.map = fl6[v]; if (m.bumpMap) m.bumpMap = m.map; m.needsUpdate = true;
+    if (v === 'nova') { s7.map = fl7nova.map; s7.bumpMap = fl7nova.bump; } else { s7.map = fl7of(v); if (s7.bumpMap) s7.bumpMap = s7.map; }
+    s7.needsUpdate = true;
+  });
   document.getElementById('gbstone').addEventListener('change', (e) => { const o = st3[e.target.value], m = MAT['ST-3']; m.map = o.map; m.bumpMap = o.map; m.bumpScale = o.bump; m.roughness = o.r; m.clearcoat = o.cc; m.needsUpdate = true; });
   window.__ops = (on) => OPS.forEach((op) => (op.target = on ? 1 : 0));
   document.getElementById('openall').addEventListener('click', () => window.__ops(true));
